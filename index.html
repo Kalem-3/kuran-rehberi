@@ -14,9 +14,9 @@
             --border-light: #C8E6C9;
             --border-medium: #A5D6A7;
             
-            /* GÜNCELLENDİ: VURGULAMA RENKLERİ */
+            /* VURGULAMA RENKLERİ */
             --highlight-bg: #FFF9C4; /* Açık Sarı Zemin */
-            --highlight-text: #1B5E20; /* Koyu Yeşil Yazı (Kırmızı yerine) */
+            --highlight-text: #1B5E20; /* Koyu Yeşil Yazı */
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -136,15 +136,18 @@
             padding-left: 12px;
             border-left: 4px solid var(--border-medium);
         }
+        
+        /* GÜNCELLENDİ: İsimler artık Yeşil */
         .translator-name {
             font-size: 11px;
-            color: #E67E22;
+            color: var(--primary); /* Turuncu yerine Ana Yeşil Renk */
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 800;
             display: block;
             margin-bottom: 4px;
         }
+        
         .text-sub {
             font-size: 15px;
             color: #455A64;
@@ -174,10 +177,10 @@
             margin-top:60px;
         }
 
-        /* --- VURGULAMA STİLİ (GÜNCELLENDİ) --- */
+        /* Highlight Stili */
         .highlight-term {
-            background-color: var(--highlight-bg); /* Sarı Zemin */
-            color: var(--highlight-text); /* Koyu Yeşil Yazı */
+            background-color: var(--highlight-bg);
+            color: var(--highlight-text);
             font-weight: 900;
             text-transform: uppercase;
             padding: 0 4px;
@@ -271,7 +274,7 @@
 
             const isNumber = /^\d+$/.test(query);
             if (!isNumber && query.length < 2) {
-                resultsContainer.innerHTML = '<div class="empty-state-text"><h3>Kuran Rehberi</h3><p>Destur Sultanım, Yeni Arama Yapmak İçin Yazmaya Başlayabilirsiniz...</p></div>';
+                resultsContainer.innerHTML = '<div class="empty-state-text"><h3>Kuran Rehberi</h3><p>Destur Sultanım Yeni Arama Yapmak İçin Yazmaya Başlayabilirsiniz...</p></div>';
                 return;
             }
 
@@ -300,8 +303,6 @@
                 } else {
                     const lowerQuery = query.toLowerCase();
                     allSearchResults = DB.filter(item => {
-                        // Eğer Python ile yeni veriyi çektiyseniz tr_bilmen çalışır,
-                        // Çekmediyseniz hata vermez, sadece sonuç getirmez.
                         const t1 = item.tr_elmalili ? item.tr_elmalili.toLowerCase() : "";
                         const t2 = item.tr_bilmen ? item.tr_bilmen.toLowerCase() : "";
                         const t3 = item[activeLang] ? item[activeLang].toLowerCase() : "";
@@ -346,23 +347,28 @@
         function createCard(row) {
             let htmlContent = '';
             
-            // Tüm metinlerde highlight yap
             const h = (t) => highlightText(t, currentSearchTerm);
 
             if (activeLang === 'tr') {
-                htmlContent += `<div class="translator-name" style="color:var(--primary);">ELMALILI HAMDİ YAZIR</div>`;
+                htmlContent += `<div class="translator-name">ELMALILI HAMDİ YAZIR</div>`;
                 htmlContent += `<div class="text-main">${h(row.tr_elmalili) || '...'}</div>`;
                 
                 htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", h(row.tr_diyanet));
                 
-                // Eğer data.js içinde tr_bilmen varsa göster, yoksa boş geç
                 if(row.tr_bilmen) {
                      htmlContent += helperSubTrans("ÖMER NASUHİ BİLMEN", h(row.tr_bilmen));
                 }
                 
                 htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar));
             } else {
-                htmlContent += `<div class="text-main">${h(row[activeLang]) || 'Translation missing'}</div>`;
+                // Yabancı Dil Başlığı Mantığı
+                let foreignTitle = "";
+                if(activeLang === 'en') foreignTitle = "SAHIH INTERNATIONAL";
+                if(activeLang === 'de') foreignTitle = "BUBENHEIM & ELYAS";
+
+                htmlContent += `<div class="translator-name">${foreignTitle}</div>`;
+                htmlContent += `<div class="text-main">${h(row[activeLang]) || '...'}</div>`;
+                
                 htmlContent += helperSubTrans("ELMALILI", h(row.tr_elmalili));
                 htmlContent += helperSubTrans("DİYANET", h(row.tr_diyanet));
                 
