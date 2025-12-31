@@ -30,27 +30,27 @@
             z-index: 1000;
         }
 
+        /* Dil Butonları */
         .lang-scroll {
             display: flex;
-            gap: 8px;
-            overflow-x: auto;
+            justify-content: center;
+            gap: 10px;
             padding-bottom: 8px;
             margin-bottom: 10px;
-            scrollbar-width: none; 
         }
-        .lang-scroll::-webkit-scrollbar { display: none; }
 
         .lang-btn {
             background: #EDF2F7;
             border: 1px solid #E2E8F0;
-            padding: 10px 15px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
             color: #4A5568;
             transition: all 0.2s;
+            flex: 1;
+            text-align: center;
         }
         .lang-btn.active {
             background-color: var(--primary);
@@ -80,7 +80,6 @@
             margin: 0 auto;
         }
 
-        /* Bilgi Mesajı Kutusu */
         .info-box {
             background-color: #D6EAF8;
             color: #21618C;
@@ -120,23 +119,24 @@
         }
 
         .text-main {
-            font-size: 18px;
+            font-size: 19px;
             font-weight: 600;
             color: #1a202c;
             margin-bottom: 20px;
             line-height: 1.6;
         }
+        
         .sub-translation {
             margin-top: 15px;
             padding-left: 12px;
-            border-left: 3px solid #CBD5E0;
+            border-left: 4px solid #CBD5E0;
         }
         .translator-name {
-            font-size: 10px;
-            color: #718096;
+            font-size: 11px;
+            color: #E67E22;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            font-weight: bold;
+            font-weight: 800;
             display: block;
             margin-bottom: 4px;
         }
@@ -146,7 +146,6 @@
             line-height: 1.5;
         }
 
-        /* "Daha Fazla Göster" Butonu */
         .load-more-btn {
             display: block;
             width: 100%;
@@ -169,13 +168,13 @@
 
     <div class="header">
         <div class="lang-scroll" id="langButtons"></div>
-        <input type="text" id="searchInput" placeholder="Örn: 'Bakara 5', '19' veya 'Sabır'...">
+        <input type="text" id="searchInput" placeholder="Ara: 'Fatiha', 'Ali İmran', '12', 'Bakara 5' veya 'Kalem'...">
     </div>
 
     <div id="results">
         <div style="text-align:center; color:#94A3B8; margin-top:60px;">
             <h3>Kuran Rehberi</h3>
-            <p>Aradığınız ayetleri bulmak için yukarıya yazın.</p>
+            <p>Sure ismi, ayet numarası veya kelime yazarak arayabilirsiniz.</p>
         </div>
     </div>
 
@@ -183,20 +182,31 @@
 
     <script>
         // --- AYARLAR ---
-        let activeLang = 'tr_elmalili';
-        
-        // Sayfalama için değişkenler
-        let allSearchResults = []; // Bulunan tüm sonuçları burada tutacağız
-        let shownCount = 0;        // Ekrana kaç tane bastık?
-        const BATCH_SIZE = 50;     // Her seferde kaç tane yüklensin?
+        let activeLang = 'tr'; 
+        let allSearchResults = []; 
+        let shownCount = 0;        
+        const BATCH_SIZE = 50;     
 
         const languages = [
-            { id: 'tr_elmalili', label: 'Elmalılı Hamdi', type: 'tr' },
-            { id: 'tr_diyanet', label: 'Diyanet', type: 'tr' },
-            { id: 'tr_yasar', label: 'Yaşar Nuri Öztürk', type: 'tr' },
-            { id: 'en', label: 'English', type: 'foreign' },
-            { id: 'de', label: 'Deutsch', type: 'foreign' }
+            { id: 'tr', label: 'TÜRKÇE' },
+            { id: 'en', label: 'ENGLISH' },
+            { id: 'de', label: 'DEUTSCH' }
         ];
+
+        // --- YENİ: TÜRKÇE KARAKTER NORMALİZASYONU ---
+        // Bu fonksiyon "Âl-i İmrân"ı -> "aliimran" yapar. "Fâtiha"yı -> "fatiha" yapar.
+        function normalizeText(text) {
+            if (!text) return "";
+            return text.toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Şapkaları at (Â -> A)
+                .replace(/ı/g, 'i')
+                .replace(/ğ/g, 'g')
+                .replace(/ü/g, 'u')
+                .replace(/ş/g, 's')
+                .replace(/ö/g, 'o')
+                .replace(/ç/g, 'c')
+                .replace(/[^a-z0-9]/g, ""); // Boşluk, tire ve noktalamaları kaldır
+        }
 
         window.onload = () => {
             if (typeof DB === 'undefined') {
@@ -223,9 +233,9 @@
             });
         }
 
-        // --- ARAMA MOTORU ---
+        // --- ARAMA MOTORU (GELİŞMİŞ) ---
         function handleSearch() {
-            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            let query = document.getElementById('searchInput').value.trim();
             const resultsContainer = document.getElementById('results');
             
             // Sıfırlama
@@ -233,78 +243,98 @@
             shownCount = 0;
             resultsContainer.innerHTML = '';
 
-            if (query.length < 2) {
-                resultsContainer.innerHTML = '<div style="text-align:center; color:#94A3B8; margin-top:60px;"><h3>Kuran Rehberi</h3><p>Sure ismi, ayet numarası veya kelime yazarak arayabilirsiniz.</p></div>';
+            // 1-9 Arama İzni (Sayı kontrolü)
+            const isNumber = /^\d+$/.test(query);
+            if (!isNumber && query.length < 2) {
+                resultsContainer.innerHTML = '<div style="text-align:center; color:#94A3B8; margin-top:60px;"><h3>Kuran Rehberi</h3><p>Arama yapmak için yazmaya başlayın...</p></div>';
                 return;
             }
 
-            // Regex Tanımları
-            const sureAyet = /^([a-zA-ZçğıöşüÇĞİÖŞÜ\s]+)\s+(\d+)$/; // "Bakara 5"
+            // Girdiyi Normalleştir (ali imran -> aliimran)
+            const cleanQuery = normalizeText(query);
+            
+            // Regex Tanımları (Sure+Ayet ve Sadece Ayet)
+            // Regex için orijinal query'i kullanıyoruz ama isim kısmını normalize edeceğiz
+            const sureAyet = /^([a-zA-ZçğıöşüÇĞİÖŞÜ\s\-\'\^]+)\s+(\d+)$/; // "Bakara 5"
             const sadeceAyet = /^(\d+)$/; // "19"
 
             const matchSure = query.match(sureAyet);
             const matchAyet = query.match(sadeceAyet);
 
+            // --- ARAMA MANTIĞI ---
+
+            // 1. Durum: Sure Adı + Ayet No (Örn: "Bakara 5" veya "Ali imran 50")
             if (matchSure) {
-                // 1. Mod: Sure + Ayet
-                const sAd = matchSure[1].trim();
+                const sAdInput = normalizeText(matchSure[1]); // Girdiyi temizle
                 const aNo = parseInt(matchSure[2]);
-                allSearchResults = DB.filter(item => item.name.toLowerCase().includes(sAd) && item.a === aNo);
+                
+                allSearchResults = DB.filter(item => {
+                    const sAdDB = normalizeText(item.name); // DB ismini temizle
+                    // "Starts With" kullanarak "Bak" yazınca da "Bakara"yı bulabilsin
+                    return sAdDB.startsWith(sAdInput) && item.a === aNo;
+                });
             } 
+            // 2. Durum: Sadece Ayet No (Örn: "19")
             else if (matchAyet) {
-                // 2. Mod: Sadece Ayet No
                 const aNo = parseInt(matchAyet[1]);
                 allSearchResults = DB.filter(item => item.a === aNo);
             } 
+            // 3. Durum: Kelime VEYA Sadece Sure İsmi
             else {
-                // 3. Mod: Kelime Arama (KAPSAYICI MOD)
-                // "Sabır" ararsan "Sabrın", "Sabret" de gelir.
-                // "Allah" ararsan "Allah'ın" da gelir.
-                // Evet "At" ararsan "Hayat" da gelir ama bu katlanılabilir bir maliyettir.
-                allSearchResults = DB.filter(item => {
-                    const text = item[activeLang] ? item[activeLang].toLowerCase() : "";
-                    return text.includes(query);
-                });
+                // ÖNCE: Girdi bir Sure ismi mi? (Örn: "Yasin", "Ali Imran")
+                // Eğer öyleyse Sure'nin tamamını getir.
+                const sureEslestirme = DB.filter(item => normalizeText(item.name) === cleanQuery);
+                
+                if (sureEslestirme.length > 0) {
+                    // Tam eşleşen sure bulduk! (Örn: Kullanıcı 'yasin' yazdı)
+                    allSearchResults = sureEslestirme;
+                } else {
+                    // Sure ismi değilse, metin içinde ara (Kelime Arama)
+                    const lowerQuery = query.toLowerCase(); // Kelime aramada standart küçük harf
+                    
+                    allSearchResults = DB.filter(item => {
+                        const searchInTr = item.tr_elmalili ? item.tr_elmalili.toLowerCase() : "";
+                        const searchInActive = item[activeLang] ? item[activeLang].toLowerCase() : "";
+                        
+                        // Ayrıca sure isminin içinde geçiyor mu? (Örn: "imran" yazınca Ali İmran gelsin)
+                        const searchInName = item.name.toLowerCase();
+
+                        return searchInTr.includes(lowerQuery) || 
+                               searchInActive.includes(lowerQuery) ||
+                               searchInName.includes(lowerQuery);
+                    });
+                }
             }
 
-            // --- SONUÇ SAYISINI GÖSTER ---
+            // Sonuçları Göster
             if (allSearchResults.length > 0) {
                 const infoBox = document.createElement('div');
                 infoBox.className = 'info-box';
                 infoBox.innerText = `Toplam ${allSearchResults.length} sonuç bulundu.`;
                 resultsContainer.appendChild(infoBox);
-                
-                // İlk partiyi yükle
                 loadMore();
             } else {
                 resultsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#e74c3c;">Sonuç bulunamadı.</div>';
             }
         }
 
-        // --- PARÇA PARÇA YÜKLEME FONKSİYONU ---
+        // --- YÜKLEME ---
         function loadMore() {
             const container = document.getElementById('results');
-            
-            // Eski butonu kaldır
             const oldBtn = document.querySelector('.load-more-btn');
             if(oldBtn) oldBtn.remove();
 
-            // Sıradaki parçayı al
             const nextBatch = allSearchResults.slice(shownCount, shownCount + BATCH_SIZE);
-            
             nextBatch.forEach(row => {
                 const card = createCard(row);
                 container.appendChild(card);
             });
-
             shownCount += nextBatch.length;
 
-            // Eğer hala gösterilmemiş sonuç varsa butonu ekle
             if (shownCount < allSearchResults.length) {
                 const btn = document.createElement('div');
                 btn.className = 'load-more-btn';
-                const kalan = allSearchResults.length - shownCount;
-                btn.innerText = `Daha Fazla Göster (${kalan} tane daha)`;
+                btn.innerText = `Daha Fazla Göster (${allSearchResults.length - shownCount} tane daha)`;
                 btn.onclick = loadMore; 
                 container.appendChild(btn);
             }
@@ -312,22 +342,19 @@
 
         // --- KART OLUŞTURMA ---
         function createCard(row) {
-            const currentLangObj = languages.find(l => l.id === activeLang);
             let htmlContent = '';
 
-            // Ana Metin
-            htmlContent += `<div class="text-main">${row[activeLang] || 'Çeviri yok'}</div>`;
-            
-            // Alt Çeviriler
-            const trLanguages = languages.filter(l => l.type === 'tr' && l.id !== activeLang);
-            trLanguages.forEach(l => {
-                htmlContent += `
-                    <div class="sub-translation">
-                        <span class="translator-name">${l.label}</span>
-                        <div class="text-sub">${row[l.id] || '...'}</div>
-                    </div>
-                `;
-            });
+            if (activeLang === 'tr') {
+                htmlContent += `<div class="translator-name" style="color:#2E86C1;">ELMALILI HAMDİ YAZIR</div>`;
+                htmlContent += `<div class="text-main">${row.tr_elmalili || '...'}</div>`;
+                htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", row.tr_diyanet);
+                htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", row.tr_yasar);
+            } else {
+                htmlContent += `<div class="text-main">${row[activeLang] || 'Translation missing'}</div>`;
+                htmlContent += helperSubTrans("ELMALILI", row.tr_elmalili);
+                htmlContent += helperSubTrans("DİYANET", row.tr_diyanet);
+                htmlContent += helperSubTrans("YAŞAR NURİ", row.tr_yasar);
+            }
 
             const card = document.createElement('div');
             card.className = 'verse-card';
@@ -339,6 +366,15 @@
                 ${htmlContent}
             `;
             return card;
+        }
+
+        function helperSubTrans(name, text) {
+            return `
+                <div class="sub-translation">
+                    <span class="translator-name">${name}</span>
+                    <div class="text-sub">${text || '...'}</div>
+                </div>
+            `;
         }
     </script>
 </body>
