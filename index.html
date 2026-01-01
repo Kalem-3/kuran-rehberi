@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kuran Rehberi">
+
     <title>Kuran Rehberi</title>
     <style>
-        /* --- YEŞİL TEMA & AYARLAR --- */
+        /* --- YEŞİL TEMA & AYARLAR (AYNEN KORUNDU) --- */
         :root {
             --primary: #388E3C;
             --bg: #F1F8E9;
@@ -137,10 +142,9 @@
             border-left: 4px solid var(--border-medium);
         }
         
-        /* GÜNCELLENDİ: İsimler artık Yeşil */
         .translator-name {
             font-size: 11px;
-            color: var(--primary); /* Turuncu yerine Ana Yeşil Renk */
+            color: var(--primary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 800;
@@ -177,7 +181,7 @@
             margin-top:60px;
         }
 
-        /* Highlight Stili */
+        /* Highlight Stili (Aynen Korundu) */
         .highlight-term {
             background-color: var(--highlight-bg);
             color: var(--highlight-text);
@@ -274,7 +278,7 @@
 
             const isNumber = /^\d+$/.test(query);
             if (!isNumber && query.length < 2) {
-                resultsContainer.innerHTML = '<div class="empty-state-text"><h3>Kuran Rehberi</h3><p>Destur Sultanım Yeni Arama Yapmak İçin Yazmaya Başlayabilirsiniz...</p></div>';
+                resultsContainer.innerHTML = '<div class="empty-state-text"><h3>Kuran Rehberi</h3><p>Destur Sultanım, Yeni Arama Yapmak İçin Yazmaya Başlayabilirsiniz...</p></div>';
                 return;
             }
 
@@ -303,11 +307,17 @@
                 } else {
                     const lowerQuery = query.toLowerCase();
                     allSearchResults = DB.filter(item => {
+                        // Arama Kapsamına Ömer Çelik Eklendi
                         const t1 = item.tr_elmalili ? item.tr_elmalili.toLowerCase() : "";
-                        const t2 = item.tr_bilmen ? item.tr_bilmen.toLowerCase() : "";
-                        const t3 = item[activeLang] ? item[activeLang].toLowerCase() : "";
+                        const t2 = item.tr_omer_celik ? item.tr_omer_celik.toLowerCase() : ""; 
+                        const t3 = item.tr_yasar ? item.tr_yasar.toLowerCase() : "";
+                        const t4 = item.tr_diyanet ? item.tr_diyanet.toLowerCase() : "";
+                        const t5 = item[activeLang] ? item[activeLang].toLowerCase() : "";
                         const name = item.name.toLowerCase();
-                        return t1.includes(lowerQuery) || t2.includes(lowerQuery) || t3.includes(lowerQuery) || name.includes(lowerQuery);
+                        
+                        return t1.includes(lowerQuery) || t2.includes(lowerQuery) || 
+                               t3.includes(lowerQuery) || t4.includes(lowerQuery) ||
+                               t5.includes(lowerQuery) || name.includes(lowerQuery);
                     });
                 }
             }
@@ -344,24 +354,28 @@
             }
         }
 
+        // --- SIRALAMA VE GÖRÜNÜM GÜNCELLENDİ ---
         function createCard(row) {
             let htmlContent = '';
             
             const h = (t) => highlightText(t, currentSearchTerm);
 
             if (activeLang === 'tr') {
-                htmlContent += `<div class="translator-name">ELMALILI HAMDİ YAZIR</div>`;
-                htmlContent += `<div class="text-main">${h(row.tr_elmalili) || '...'}</div>`;
+                // 1. ÖMER ÇELİK (ANA METİN)
+                htmlContent += `<div class="translator-name">PROF. DR. ÖMER ÇELİK</div>`;
+                htmlContent += `<div class="text-main">${h(row.tr_omer_celik) || '...'}</div>`;
                 
+                // 2. ELMALILI (ALT METİN)
+                htmlContent += helperSubTrans("ELMALILI HAMDİ YAZIR", h(row.tr_elmalili));
+                
+                // 3. YAŞAR NURİ (ALT METİN)
+                htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar));
+
+                // 4. DİYANET (ALT METİN)
                 htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", h(row.tr_diyanet));
                 
-                if(row.tr_bilmen) {
-                     htmlContent += helperSubTrans("ÖMER NASUHİ BİLMEN", h(row.tr_bilmen));
-                }
-                
-                htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar));
             } else {
-                // Yabancı Dil Başlığı Mantığı
+                // YABANCI DİL MODU
                 let foreignTitle = "";
                 if(activeLang === 'en') foreignTitle = "SAHIH INTERNATIONAL";
                 if(activeLang === 'de') foreignTitle = "BUBENHEIM & ELYAS";
@@ -369,14 +383,13 @@
                 htmlContent += `<div class="translator-name">${foreignTitle}</div>`;
                 htmlContent += `<div class="text-main">${h(row[activeLang]) || '...'}</div>`;
                 
-                htmlContent += helperSubTrans("ELMALILI", h(row.tr_elmalili));
-                htmlContent += helperSubTrans("DİYANET", h(row.tr_diyanet));
-                
-                if(row.tr_bilmen) {
-                    htmlContent += helperSubTrans("ÖMER NASUHİ BİLMEN", h(row.tr_bilmen));
+                // Yabancı dilde de alt sıralamayı aynı yapalım:
+                if(row.tr_omer_celik) {
+                    htmlContent += helperSubTrans("PROF. DR. ÖMER ÇELİK", h(row.tr_omer_celik));
                 }
-
+                htmlContent += helperSubTrans("ELMALILI", h(row.tr_elmalili));
                 htmlContent += helperSubTrans("YAŞAR NURİ", h(row.tr_yasar));
+                htmlContent += helperSubTrans("DİYANET", h(row.tr_diyanet));
             }
 
             const card = document.createElement('div');
