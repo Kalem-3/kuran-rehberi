@@ -132,7 +132,7 @@
             font-size: 19px;
             font-weight: 600;
             color: #1B2631;
-            margin-bottom: 20px;
+            margin-bottom: 5px; /* Buton için boşluk ayarlandı */
             line-height: 1.6;
         }
         
@@ -181,7 +181,7 @@
             margin-top:60px;
         }
 
-        /* Highlight Stili (Aynen Korundu) */
+        /* Highlight Stili */
         .highlight-term {
             background-color: var(--highlight-bg);
             color: var(--highlight-text);
@@ -190,6 +190,49 @@
             padding: 0 4px;
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* --- YENİ EKLENEN KOPYALA BUTONU STİLLERİ --- */
+        .copy-action-wrapper {
+            display: flex;
+            justify-content: flex-end; /* Sağa yasla */
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+
+        .btn-copy {
+            background-color: transparent;
+            border: 1px solid var(--border-medium);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-copy:hover {
+            background-color: #E8F5E9;
+        }
+
+        .btn-copy:active {
+            transform: scale(0.95);
+        }
+
+        .btn-copy svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        .btn-copy.copied {
+            background-color: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
         }
     </style>
 </head>
@@ -215,7 +258,7 @@
         let allSearchResults = []; 
         let shownCount = 0;        
         let currentSearchTerm = "";
-        const BATCH_SIZE = 50;     
+        const BATCH_SIZE = 50;      
 
         const languages = [
             { id: 'tr', label: 'TÜRKÇE' },
@@ -307,7 +350,6 @@
                 } else {
                     const lowerQuery = query.toLowerCase();
                     allSearchResults = DB.filter(item => {
-                        // Arama Kapsamına Ömer Çelik Eklendi
                         const t1 = item.tr_elmalili ? item.tr_elmalili.toLowerCase() : "";
                         const t2 = item.tr_omer_celik ? item.tr_omer_celik.toLowerCase() : ""; 
                         const t3 = item.tr_yasar ? item.tr_yasar.toLowerCase() : "";
@@ -354,25 +396,66 @@
             }
         }
 
-        // --- SIRALAMA VE GÖRÜNÜM GÜNCELLENDİ ---
+        // --- KOPYALAMA FONKSİYONU (YENİ) ---
+        function copyToClipboard(btn, text, refInfo) {
+            // Referans bilgisini metnin sonuna ekleyelim (Opsiyonel, istemezsen refInfo'yu silebilirsin)
+            const textToCopy = `${text}\n(${refInfo})`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalContent = btn.innerHTML;
+                
+                // Buton görsel geri bildirimi
+                btn.classList.add('copied');
+                btn.innerHTML = 'Kopyalandı!';
+                
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = originalContent;
+                }, 1500);
+            }).catch(err => {
+                console.error('Kopyalama hatası:', err);
+            });
+        }
+
+        // --- BUTON HTML OLUŞTURUCU (YENİ) ---
+        function getCopyBtnHtml(text, sourceName, sureName, ayetNo) {
+            if(!text) return '';
+            // HTML etiketlerini ve tırnak işaretlerini güvenli hale getir
+            const safeText = text.replace(/"/g, '&quot;');
+            const refInfo = `${sureName} Suresi ${ayetNo}. Ayet - ${sourceName}`;
+            
+            // SVG Icon
+            const iconSvg = `<svg viewBox="0 0 24 24"><path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z"/></svg>`;
+
+            return `
+                <div class="copy-action-wrapper">
+                    <button class="btn-copy" onclick="copyToClipboard(this, '${safeText}', '${refInfo}')">
+                        ${iconSvg} Kopyala
+                    </button>
+                </div>
+            `;
+        }
+
+        // --- SIRALAMA VE GÖRÜNÜM ---
         function createCard(row) {
             let htmlContent = '';
-            
             const h = (t) => highlightText(t, currentSearchTerm);
 
             if (activeLang === 'tr') {
                 // 1. ÖMER ÇELİK (ANA METİN)
                 htmlContent += `<div class="translator-name">PROF. DR. ÖMER ÇELİK</div>`;
                 htmlContent += `<div class="text-main">${h(row.tr_omer_celik) || '...'}</div>`;
+                // Ana metin için kopyala butonu
+                htmlContent += getCopyBtnHtml(row.tr_omer_celik, "Ömer Çelik Meali", row.name, row.a);
                 
                 // 2. ELMALILI (ALT METİN)
-                htmlContent += helperSubTrans("ELMALILI HAMDİ YAZIR", h(row.tr_elmalili));
+                htmlContent += helperSubTrans("ELMALILI HAMDİ YAZIR", h(row.tr_elmalili), row.tr_elmalili, row.name, row.a);
                 
                 // 3. YAŞAR NURİ (ALT METİN)
-                htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar));
+                htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar), row.tr_yasar, row.name, row.a);
 
                 // 4. DİYANET (ALT METİN)
-                htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", h(row.tr_diyanet));
+                htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", h(row.tr_diyanet), row.tr_diyanet, row.name, row.a);
                 
             } else {
                 // YABANCI DİL MODU
@@ -382,14 +465,15 @@
 
                 htmlContent += `<div class="translator-name">${foreignTitle}</div>`;
                 htmlContent += `<div class="text-main">${h(row[activeLang]) || '...'}</div>`;
+                // Yabancı dil ana metin butonu
+                htmlContent += getCopyBtnHtml(row[activeLang], foreignTitle, row.name, row.a);
                 
-                // Yabancı dilde de alt sıralamayı aynı yapalım:
                 if(row.tr_omer_celik) {
-                    htmlContent += helperSubTrans("PROF. DR. ÖMER ÇELİK", h(row.tr_omer_celik));
+                    htmlContent += helperSubTrans("PROF. DR. ÖMER ÇELİK", h(row.tr_omer_celik), row.tr_omer_celik, row.name, row.a);
                 }
-                htmlContent += helperSubTrans("ELMALILI", h(row.tr_elmalili));
-                htmlContent += helperSubTrans("YAŞAR NURİ", h(row.tr_yasar));
-                htmlContent += helperSubTrans("DİYANET", h(row.tr_diyanet));
+                htmlContent += helperSubTrans("ELMALILI", h(row.tr_elmalili), row.tr_elmalili, row.name, row.a);
+                htmlContent += helperSubTrans("YAŞAR NURİ", h(row.tr_yasar), row.tr_yasar, row.name, row.a);
+                htmlContent += helperSubTrans("DİYANET", h(row.tr_diyanet), row.tr_diyanet, row.name, row.a);
             }
 
             const card = document.createElement('div');
@@ -404,11 +488,13 @@
             return card;
         }
 
-        function helperSubTrans(name, text) {
+        // rawText parametresi eklendi, böylece highlight edilmemiş saf metni butona gönderebiliyoruz.
+        function helperSubTrans(name, displayText, rawText, sureName, ayetNo) {
             return `
                 <div class="sub-translation">
                     <span class="translator-name">${name}</span>
-                    <div class="text-sub">${text || '...'}</div>
+                    <div class="text-sub">${displayText || '...'}</div>
+                    ${getCopyBtnHtml(rawText, name, sureName, ayetNo)}
                 </div>
             `;
         }
