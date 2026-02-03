@@ -132,7 +132,7 @@
             font-size: 19px;
             font-weight: 600;
             color: #1B2631;
-            margin-bottom: 5px; /* Buton için boşluk ayarlandı */
+            margin-bottom: 5px;
             line-height: 1.6;
         }
         
@@ -192,10 +192,10 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
-        /* --- YENİ EKLENEN KOPYALA BUTONU STİLLERİ --- */
+        /* --- KOPYALA BUTONU STİLLERİ --- */
         .copy-action-wrapper {
             display: flex;
-            justify-content: flex-end; /* Sağa yasla */
+            justify-content: flex-end; 
             margin-top: 5px;
             margin-bottom: 10px;
         }
@@ -396,77 +396,120 @@
             }
         }
 
-        // --- KOPYALAMA FONKSİYONU (YENİ) ---
-        function copyToClipboard(btn, text, refInfo) {
-            // Referans bilgisini metnin sonuna ekleyelim (Opsiyonel, istemezsen refInfo'yu silebilirsin)
-            const textToCopy = `${text}\n(${refInfo})`;
+        // --- GÜNCELLENMİŞ KOPYALAMA FONKSİYONU ---
+        // Daha güvenilir çalışması için yeniden yazıldı.
+        function copyToClipboard(btn) {
+            // Veriyi butondaki data attribute'larından çekiyoruz (Tırnak hatasını önler)
+            const rawText = btn.getAttribute('data-text');
+            const headerInfo = btn.getAttribute('data-header');
+
+            if (!rawText) return;
+
+            // İstenen Format: Sure Ayet: [Alt satır] Metin
+            const textToCopy = `${headerInfo}:\n${rawText}`;
             
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                const originalContent = btn.innerHTML;
-                
-                // Buton görsel geri bildirimi
-                btn.classList.add('copied');
-                btn.innerHTML = 'Kopyalandı!';
-                
-                setTimeout(() => {
-                    btn.classList.remove('copied');
-                    btn.innerHTML = originalContent;
-                }, 1500);
-            }).catch(err => {
-                console.error('Kopyalama hatası:', err);
-            });
+            // Modern panoya kopyalama API'si
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showCopyFeedback(btn);
+                }).catch(err => {
+                    console.error('Kopyalama hatası, fallback deneniyor:', err);
+                    fallbackCopyTextToClipboard(textToCopy, btn);
+                });
+            } else {
+                // Eski tarayıcılar veya güvenli olmayan bağlantılar için yedek yöntem
+                fallbackCopyTextToClipboard(textToCopy, btn);
+            }
         }
 
-        // --- BUTON HTML OLUŞTURUCU (YENİ) ---
-        function getCopyBtnHtml(text, sourceName, sureName, ayetNo) {
+        // Yedek kopyalama yöntemi (Bazen çalışmama sorununu çözer)
+        function fallbackCopyTextToClipboard(text, btn) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopyFeedback(btn);
+                }
+            } catch (err) {
+                console.error('Yedek kopyalama da başarısız:', err);
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function showCopyFeedback(btn) {
+            const originalContent = btn.innerHTML;
+            btn.classList.add('copied');
+            btn.innerHTML = 'Kopyalandı!';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = originalContent;
+            }, 1500);
+        }
+
+        // --- BUTON HTML OLUŞTURUCU (GÜNCELLENDİ) ---
+        function getCopyBtnHtml(text, sureName, ayetNo) {
             if(!text) return '';
-            // HTML etiketlerini ve tırnak işaretlerini güvenli hale getir
-            const safeText = text.replace(/"/g, '&quot;');
-            const refInfo = `${sureName} Suresi ${ayetNo}. Ayet - ${sourceName}`;
             
-            // SVG Icon
+            // Tırnak işaretlerini güvenli hale getir (tek ve çift tırnaklar)
+            // Bu sayede "bazen çalışmıyor" hatası düzelir.
+            const safeText = text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            
+            // Format başlığı
+            const headerInfo = `${sureName} Suresi ${ayetNo}. Ayet`;
+            
             const iconSvg = `<svg viewBox="0 0 24 24"><path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z"/></svg>`;
 
+            // Metni ve başlığı data attribute olarak ekliyoruz (daha güvenli)
             return `
                 <div class="copy-action-wrapper">
-                    <button class="btn-copy" onclick="copyToClipboard(this, '${safeText}', '${refInfo}')">
+                    <button class="btn-copy" 
+                        data-text="${safeText}" 
+                        data-header="${headerInfo}" 
+                        onclick="copyToClipboard(this)">
                         ${iconSvg} Kopyala
                     </button>
                 </div>
             `;
         }
 
-        // --- SIRALAMA VE GÖRÜNÜM ---
+        // --- KART OLUŞTURMA (AYNI) ---
         function createCard(row) {
             let htmlContent = '';
             const h = (t) => highlightText(t, currentSearchTerm);
 
             if (activeLang === 'tr') {
-                // 1. ÖMER ÇELİK (ANA METİN)
+                // 1. ÖMER ÇELİK
                 htmlContent += `<div class="translator-name">PROF. DR. ÖMER ÇELİK</div>`;
                 htmlContent += `<div class="text-main">${h(row.tr_omer_celik) || '...'}</div>`;
-                // Ana metin için kopyala butonu
-                htmlContent += getCopyBtnHtml(row.tr_omer_celik, "Ömer Çelik Meali", row.name, row.a);
+                htmlContent += getCopyBtnHtml(row.tr_omer_celik, row.name, row.a);
                 
-                // 2. ELMALILI (ALT METİN)
+                // 2. ELMALILI
                 htmlContent += helperSubTrans("ELMALILI HAMDİ YAZIR", h(row.tr_elmalili), row.tr_elmalili, row.name, row.a);
                 
-                // 3. YAŞAR NURİ (ALT METİN)
+                // 3. YAŞAR NURİ
                 htmlContent += helperSubTrans("YAŞAR NURİ ÖZTÜRK", h(row.tr_yasar), row.tr_yasar, row.name, row.a);
 
-                // 4. DİYANET (ALT METİN)
+                // 4. DİYANET
                 htmlContent += helperSubTrans("DİYANET İŞLERİ (YENİ)", h(row.tr_diyanet), row.tr_diyanet, row.name, row.a);
                 
             } else {
-                // YABANCI DİL MODU
+                // YABANCI DİL
                 let foreignTitle = "";
                 if(activeLang === 'en') foreignTitle = "SAHIH INTERNATIONAL";
                 if(activeLang === 'de') foreignTitle = "BUBENHEIM & ELYAS";
 
                 htmlContent += `<div class="translator-name">${foreignTitle}</div>`;
                 htmlContent += `<div class="text-main">${h(row[activeLang]) || '...'}</div>`;
-                // Yabancı dil ana metin butonu
-                htmlContent += getCopyBtnHtml(row[activeLang], foreignTitle, row.name, row.a);
+                htmlContent += getCopyBtnHtml(row[activeLang], row.name, row.a);
                 
                 if(row.tr_omer_celik) {
                     htmlContent += helperSubTrans("PROF. DR. ÖMER ÇELİK", h(row.tr_omer_celik), row.tr_omer_celik, row.name, row.a);
@@ -488,13 +531,12 @@
             return card;
         }
 
-        // rawText parametresi eklendi, böylece highlight edilmemiş saf metni butona gönderebiliyoruz.
         function helperSubTrans(name, displayText, rawText, sureName, ayetNo) {
             return `
                 <div class="sub-translation">
                     <span class="translator-name">${name}</span>
                     <div class="text-sub">${displayText || '...'}</div>
-                    ${getCopyBtnHtml(rawText, name, sureName, ayetNo)}
+                    ${getCopyBtnHtml(rawText, sureName, ayetNo)}
                 </div>
             `;
         }
